@@ -1,0 +1,146 @@
+--// SETTINGS
+local MaxSpeed = 300
+
+--// SERVICES
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+--// STATE
+local Enabled = false
+local RunningThread
+local ScriptAlive = true
+
+--// CHARACTER
+local function getCharacter()
+    if not LocalPlayer.Character then
+        LocalPlayer.CharacterAdded:Wait()
+    end
+    return LocalPlayer.Character
+end
+
+--// SORT BY DISTANCE
+local function DistanceFromPlrSort(ObjectList)
+    local RootPart = getCharacter():WaitForChild("LowerTorso")
+    table.sort(ObjectList, function(A, B)
+        local pos = RootPart.Position
+        return (pos - A.Position).Magnitude < (pos - B.Position).Magnitude
+    end)
+end
+
+--// CHESTS
+local UncheckedChests = {}
+local FirstRun = true
+
+local function getChestsSorted()
+    if FirstRun then
+        FirstRun = false
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj.Name:find("Chest") and obj:IsA("Part") then
+                table.insert(UncheckedChests, obj)
+            end
+        end
+    end
+
+    local Chests = {}
+    for _, chest in pairs(UncheckedChests) do
+        if chest:FindFirstChild("TouchInterest") then
+            table.insert(Chests, chest)
+        end
+    end
+
+    DistanceFromPlrSort(Chests)
+    return Chests
+end
+
+--// NOCLIP
+local function toggleNoclip(state)
+    for _, v in pairs(getCharacter():GetChildren()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = not state
+        end
+    end
+end
+
+--// TELEPORT
+local function Teleport(goal, speed)
+    if not Enabled or not ScriptAlive then return end
+    speed = speed or MaxSpeed
+
+    toggleNoclip(true)
+    local root = getCharacter():WaitForChild("HumanoidRootPart")
+
+    while Enabled and ScriptAlive and (root.Position - goal.Position).Magnitude > 1 do
+        local dir = (goal.Position - root.Position).Unit
+        root.CFrame = root.CFrame + dir * (speed * task.wait())
+    end
+
+    toggleNoclip(false)
+end
+
+--// MAIN LOOP
+local function main()
+    while Enabled and ScriptAlive do
+        local chests = getChestsSorted()
+        if #chests > 0 then
+            Teleport(chests[1].CFrame)
+        end
+        task.wait()
+    end
+end
+
+--// STOP EVERYTHING
+local function StopScript()
+    Enabled = false
+    ScriptAlive = false
+    toggleNoclip(false)
+end
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(150, 70)
+frame.Position = UDim2.fromScale(0.7, 0.1)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Parent = gui
+
+-- Toggle Button
+local button = Instance.new("TextButton")
+button.Size = UDim2.fromOffset(130, 30)
+button.Position = UDim2.fromOffset(10, 30)
+button.Text = "Dynamic Chest: OFF"
+button.BackgroundColor3 = Color3.fromRGB(40,40,40)
+button.TextColor3 = Color3.new(1,1,1)
+button.TextScaled = true
+button.Parent = frame
+
+-- Close Button
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(25, 25)
+close.Position = UDim2.fromOffset(130, -5)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+close.TextColor3 = Color3.new(1,1,1)
+close.TextScaled = true
+close.Parent = frame
+
+--// TOGGLE
+button.MouseButton1Click:Connect(function()
+    if not ScriptAlive then return end
+
+    Enabled = not Enabled
+    button.Text = Enabled and "Chest TP: ON" or "Chest TP: OFF"
+
+    if Enabled then
+        RunningThread = task.spawn(main)
+    end
+end)
+
+--// CLOSE
+close.MouseButton1Click:Connect(function()
+    StopScript()
+    gui:Destroy()
+end)
