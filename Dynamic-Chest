@@ -132,7 +132,7 @@ button.MouseButton1Click:Connect(function()
     if not ScriptAlive then return end
 
     Enabled = not Enabled
-    button.Text = Enabled and "Chest TP: ON" or "Chest TP: OFF"
+    button.Text = Enabled and "Dynamic Chest: ON" or "Dynamic Chest: OFF"
 
     if Enabled then
         RunningThread = task.spawn(main)
